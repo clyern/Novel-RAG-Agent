@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novel Agent - 专属小说助手</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+        body {
+            background-color: #ffffff;
+            color: #1a1a1a;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 光晕加深、加大 */
+        .bg-glow {
+            position: absolute;
+            top: 45%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 1000px; height: 1000px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.35) 0%, rgba(255, 255, 255, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* 顶部导航栏 */
+        .header {
+            padding: 20px 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 14px; color: #666;
+            flex-shrink: 0;
+        }
+        .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #000; font-size: 16px; }
+        .logo-icon { width: 24px; height: 24px; background-color: #000; color: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+        /* 中间内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            overflow-y: auto;
+            padding: 0 20px;
+        }
+
+        /* --- 初始欢迎页 --- */
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+        }
+        .greeting { font-size: 26px; font-weight: 500; margin-bottom: 30px; color: #111; }
+
+        /* 推荐问题 */
+        .examples { width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+        .examples-title { font-size: 13px; color: #888; margin-bottom: 8px; }
+        .example-btn { background: transparent; border: none; text-align: left; padding: 12px; border-radius: 8px; color: #444; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; transition: background 0.2s; border: 1px solid transparent;}
+        .example-btn:hover { background-color: #f9f9f9; border-color: #f0f0f0; }
+        .example-btn::after { content: "›"; color: #999; font-size: 18px; line-height: 1; }
+
+        /* --- 聊天记录列表 --- */
+        .chat-list {
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            width: 100%;
+            padding: 20px 0 40px 0;
+            gap: 32px;
+        }
+
+        .message { display: flex; flex-direction: column; line-height: 1.7; font-size: 15px; }
+
+        /* 用户消息（右侧，浅紫色气泡深紫字） */
+        .message.user { align-items: flex-end; }
+        .message.user .bubble {
+            background-color: #ede9fe;
+            padding: 12px 20px;
+            border-radius: 18px;
+            max-width: 80%;
+            color: #4c1d95;
+            font-weight: 500;
+        }
+
+        /* Agent 消息（左侧，无气泡纯文本） */
+        .message.agent { align-items: flex-start; }
+        .message.agent .bubble { max-width: 100%; color: #1a1a1a; width: 100%; }
+
+        /* Markdown 解析后的样式（深紫色加粗） */
+        .message.agent .bubble p { margin-bottom: 12px; }
+        .message.agent .bubble strong { font-weight: 600; color: #6d28d9; }
+        .message.agent .bubble ul, .message.agent .bubble ol { padding-left: 20px; margin-bottom: 12px; }
+        .message.agent .bubble li { margin-bottom: 6px; }
+
+        /* --- 底部固定输入框 --- */
+        .bottom-input-area {
+            width: 100%;
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 20px;
+            flex-shrink: 0;
+            background: linear-gradient(to top, rgba(255,255,255,1) 60%, rgba(255,255,255,0));
+            position: relative;
+            z-index: 10;
+        }
+
+        .input-wrapper {
+            width: 100%;
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            padding: 12px 16px;
+            transition: all 0.3s ease;
+        }
+
+        .input-wrapper:focus-within {
+            box-shadow: 0 4px 25px rgba(109, 40, 217, 0.15);
+            border-color: #a78bfa;
+        }
+
+        .input-wrapper textarea {
+            width: 100%; border: none; outline: none; resize: none; font-size: 16px; padding: 8px 5px; height: 48px; line-height: 1.5; font-family: inherit;
+        }
+
+        .input-actions { display: flex; justify-content: flex-end; margin-top: 5px; }
+
+        /* 发送按钮：深紫色 */
+        .send-btn {
+            width: 32px; height: 32px; border-radius: 50%;
+            background-color: #7c3aed;
+            color: #fff; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s;
+        }
+        .send-btn:hover { background-color: #6d28d9; }
+        .send-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* 切换视图的类 */
+        body.is-chatting .welcome-screen { display: none; }
+        body.is-chatting .chat-list { display: flex; }
+
+        /* 流式输出打字光标效果 */
+        .cursor {
+            display: inline-block;
+            width: 6px;
+            background-color: #7c3aed;
+            animation: blink 1s step-end infinite;
+            margin-left: 2px;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-glow"></div>
+
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">N</div>
+            NovelAgent
+        </div>
+        <div>专属小说阅读助手</div>
+    </div>
+
+    <!-- 主体内容区 -->
+    <div class="main-content" id="mainContent">
+
+        <!-- 初始欢迎页 -->
+        <div class="welcome-screen">
+            <div class="greeting">今天想了解小说的什么内容？</div>
+            <div class="examples">
+                <div class="examples-title">推荐问题：</div>
+                <button class="example-btn" onclick="quickAsk('沈抱山是一个什么样的人？')">沈抱山是一个什么样的人？</button>
+                <button class="example-btn" onclick="quickAsk('两个主角的第一次接吻是在什么时候，具体在哪章？')">两个主角的第一次接吻是在什么时候，具体在哪章？</button>
+                <button class="example-btn" onclick="quickAsk('请简单介绍一下这本小说的核心剧情。')">请简单介绍一下这本小说的核心剧情。</button>
+            </div>
+        </div>
+
+        <!-- 聊天记录区 -->
+        <div class="chat-list" id="chatList">
+            <!-- 消息会动态插入这里 -->
+        </div>
+    </div>
+
+    <!-- 底部固定输入框 -->
+    <div class="bottom-input-area">
+        <div class="input-wrapper">
+            <textarea id="userInput" placeholder="输入你想问的问题..." onkeydown="handleEnter(event)"></textarea>
+            <div class="input-actions">
+                <button class="send-btn" id="sendBtn" onclick="handleSend()">↑</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chatHistory = [];
+        const body = document.body;
+        const chatList = document.getElementById('chatList');
+        const mainContent = document.getElementById('mainContent');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+            }
+        }
+
+        function quickAsk(text) {
+            userInput.value = text;
+            handleSend();
+        }
+
+        async function handleSend() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            body.classList.add('is-chatting');
+
+            userInput.value = '';
+            sendBtn.disabled = true;
+
+            // 1. 显示用户消息
+            appendMessage('user', text);
+
+            // 2. 创建空的 Agent 气泡用于接收流式文字
+            const messageId = 'msg-' + Date.now();
+            appendMessage('agent', '', messageId, false);
+            const bubbleElement = document.getElementById(messageId);
+
+            // 初始光标
+            bubbleElement.innerHTML = '<span class="cursor">▍</span>';
+
+            let fullAnswer = "";
+
+            try {
+                // 3. 发起流式请求
+                const response = await fetch('http://127.0.0.1:8000/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: text, history: chatHistory })
+                });
+
+                // 4. 读取数据流
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunkText = decoder.decode(value, { stream: true });
+                    fullAnswer += chunkText;
+
+                    // 实时解析并渲染
+                    bubbleElement.innerHTML = marked.parse(fullAnswer) + '<span class="cursor">▍</span>';
+                    mainContent.scrollTop = mainContent.scrollHeight;
+                }
+
+                // 流结束，移除光标
+                bubbleElement.innerHTML = marked.parse(fullAnswer);
+
+                // 5. 保存记忆
+                chatHistory.push({ role: "user", content: text });
+                chatHistory.push({ role: "assistant", content: fullAnswer });
+
+            } catch (error) {
+                bubbleElement.innerText = "❌ 连接后端失败，请检查 server.py 是否正在运行。";
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        function appendMessage(role, text, id = '', isLoading = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+
+            if (id) bubble.id = id;
+
+            // 如果传入了内容，则直接显示（用于用户消息）
+            if (text) {
+                if (role === 'agent') {
+                    bubble.innerHTML = marked.parse(text);
+                } else {
+                    bubble.innerText = text;
+                }
+            }
+
+            msgDiv.appendChild(bubble);
+            chatList.appendChild(msgDiv);
+
+            setTimeout(() => {
+                mainContent.scrollTop = mainContent.scrollHeight;
+            }, 50);
+        }
+    </script>
+</body>
+</html>
